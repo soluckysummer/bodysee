@@ -1,0 +1,20 @@
+# 虚拟环境
+.venv/
+venv/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 运行产物
+menubar.log
+*.log
+
+# 个人校准配置（每台机器/摄像头位置不同，首次运行自动生成）
+config.json
+
+# 姿态模型（首次运行自动下载，约 5.5MB）
+models/
+
+# macOS
+.DS_Store

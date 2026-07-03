@@ -1,0 +1,9 @@
+mediapipe>=0.10.35
+opencv-python>=4.10
+
+# macOS 菜单栏
+rumps>=0.4 ; sys_platform == "darwin"
+
+# Windows 系统托盘
+pystray>=0.19 ; sys_platform == "win32"
+Pillow>=10 ; sys_platform == "win32"
