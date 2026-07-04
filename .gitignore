@@ -16,5 +16,16 @@ config.json
 # 姿态模型（首次运行自动下载，约 5.5MB）
 models/
 
+# 切水果游戏：合成音效缓存 + 个人最高分
+fruitgame/assets/
+fruitgame/highscore.json
+
+# 格斗游戏：合成音效缓存
+fightgame/assets/
+
+# 缩墙勇士：合成音效缓存 + 个人最高分
+wallgame/assets/
+wallgame/highscore.json
+
 # macOS
 .DS_Store

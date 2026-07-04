@@ -1,6 +1,9 @@
 mediapipe>=0.10.35
 opencv-python>=4.10
 
+# 体感切水果小游戏
+pygame>=2.5
+
 # macOS 菜单栏
 rumps>=0.4 ; sys_platform == "darwin"
 
