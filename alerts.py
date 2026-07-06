@@ -1,8 +1,11 @@
-"""系统提醒：弹窗 + 提示音 + 通知横幅，全部非阻塞。
+"""系统提醒：通知横幅 + 提示音，全部非阻塞。
 
 按平台分支实现，对外接口一致：
-    notify(title, message, sound=..., timeout_sec=...)  # 明显的弹窗 + 声音
+    notify(title, message, sound=..., timeout_sec=...)  # 通知横幅 + 声音
     toast(title, message)                               # 轻量提示（校准完成等）
+
+macOS 上两者都是右上角系统通知，几秒后自动消失、不抢焦点，
+区别只是 notify 带提示音。Windows 上 notify 仍是超时自动关闭的弹窗。
 """
 
 import subprocess
@@ -45,28 +48,29 @@ else:
     def _osascript_quote(text):
         return text.replace("\\", "\\\\").replace('"', '\\"')
 
-    def notify(title, message, sound="Sosumi", timeout_sec=25):
-        """弹出系统对话框并播放提示音。对话框置顶显示，超时自动消失。"""
-        subprocess.Popen(
-            ["afplay", f"{SOUND_DIR}/{sound}.aiff"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-        script = (
-            f'display dialog "{_osascript_quote(message)}" '
-            f'with title "{_osascript_quote(title)}" '
-            f'buttons {{"知道了"}} default button 1 with icon caution '
-            f"giving up after {timeout_sec}"
-        )
+    def _banner(title, message):
+        """右上角系统通知横幅，几秒后自动消失，不抢焦点。
+
+        消息第一行作为通知副标题，其余作为正文，卡片上层次更清楚。
+        """
+        first, _, rest = message.partition("\n")
+        script = (f'display notification "{_osascript_quote(rest or first)}" '
+                  f'with title "{_osascript_quote(title)}"')
+        if rest:
+            script += f' subtitle "{_osascript_quote(first)}"'
         subprocess.Popen(
             ["osascript", "-e", script],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
 
-    def toast(title, message):
-        """右上角系统通知横幅（不打断操作），用于校准完成之类的轻量提示。"""
-        script = (f'display notification "{_osascript_quote(message)}" '
-                  f'with title "{_osascript_quote(title)}"')
+    def notify(title, message, sound="Sosumi", timeout_sec=25):
+        """通知横幅 + 提示音。timeout_sec 在 macOS 上由系统控制展示时长，忽略。"""
         subprocess.Popen(
-            ["osascript", "-e", script],
+            ["afplay", f"{SOUND_DIR}/{sound}.aiff"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
+        _banner(title, message)
+
+    def toast(title, message):
+        """轻量提示（校准完成等），同为通知横幅，只是不带声音。"""
+        _banner(title, message)

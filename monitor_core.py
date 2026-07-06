@@ -29,6 +29,47 @@ def grab_fresh_frame(cap):
     return frame if ok else None
 
 
+PREVIEW_WIDTH = 640  # 预览图写盘宽度（菜单里按一半宽展示，视网膜屏刚好 2x 清晰）
+
+
+def make_preview(frame, result, neck_limit=None, torso_limit=None):
+    """在采样帧上标注判定用的关键点/连线和角度，返回缩放后的预览图。
+
+    连线颜色即判定结果：绿=合格，红=超限。没检测到人则标注 no person，
+    方便用户确认是取景问题还是识别问题。
+    """
+    img = frame.copy()
+    h, w = img.shape[:2]
+    good, bad = (0, 200, 0), (0, 0, 255)
+    if result:
+        px = {name: (int(x * w), int(y * h))
+              for name, (x, y) in result["points"].items()}
+        neck_bad = neck_limit is not None and result["neck"] > neck_limit
+        torso_bad = (torso_limit is not None and result["torso"] is not None
+                     and result["torso"] > torso_limit)
+        if "hip" in px:
+            cv2.line(img, px["hip"], px["shoulder"], bad if torso_bad else good, 4)
+        cv2.line(img, px["shoulder"], px["ear"], bad if neck_bad else good, 4)
+        for pt in px.values():
+            cv2.circle(img, pt, 7, (255, 255, 255), -1)
+            cv2.circle(img, pt, 7, (60, 60, 60), 2)
+        texts = [(f"neck {result['neck']:.1f}"
+                  + (f" / {neck_limit:.1f}" if neck_limit is not None else ""),
+                  bad if neck_bad else good)]
+        if result["torso"] is not None:
+            texts.append((f"torso {result['torso']:.1f}"
+                          + (f" / {torso_limit:.1f}" if torso_limit is not None else ""),
+                          bad if torso_bad else good))
+    else:
+        texts = [("no person", (0, 165, 255))]
+    texts.append((time.strftime("%H:%M:%S"), (255, 255, 255)))
+    for i, (text, color) in enumerate(texts):
+        pos = (16, 36 + i * 32)
+        cv2.putText(img, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
+        cv2.putText(img, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+    return cv2.resize(img, (PREVIEW_WIDTH, round(h * PREVIEW_WIDTH / w)))
+
+
 def run_calibration(cap, analyzer, config, log=print, duration=10):
     """采集标准坐姿，返回基线 dict；有效采样太少返回 None。不负责保存配置。"""
     forced_side = config["track_side"] if config.get("track_side") in ("left", "right") else "auto"
@@ -74,6 +115,7 @@ class PostureMonitor:
         self.log = log or (lambda message: None)
         self.cap = None
         self.analyzer = None
+        self.preview = None  # 最近一次采样的标注预览图（BGR），take_sample 后更新
         self.status = {"present": False, "bad": [], "neck": None, "torso": None,
                        "sit_min": 0.0, "lines": ["等待首次采样..."], "updated": 0.0}
         self.reload(config)
@@ -113,18 +155,33 @@ class PostureMonitor:
             self.analyzer = None
 
     def take_sample(self):
-        """连拍多帧分别检测，取颈部角度中位的结果，抑制关键点抖动。"""
-        results = []
+        """连拍多帧分别检测，取颈部角度中位的结果，抑制关键点抖动。
+
+        同时把选中结果对应的帧做成标注预览图存到 self.preview。
+        """
+        pairs = []  # (帧, 检测结果)
         for i in range(self.frames_n):
             frame = grab_fresh_frame(self.cap)
             if frame is not None:
-                results.append(self.analyzer.analyze(frame, side=self.side))
+                pairs.append((frame, self.analyzer.analyze(frame, side=self.side)))
             if i < self.frames_n - 1:
                 time.sleep(0.1)
-        return median_result(results)
+        result = median_result([r for _, r in pairs])
+        frame = next((f for f, r in pairs if r is result),
+                     pairs[-1][0] if pairs else None)
+        if frame is not None:
+            self.preview = make_preview(frame, result,
+                                        self.neck_limit, self.torso_limit)
+        return result
 
     def step(self):
         return self.process(self.take_sample(), time.time())
+
+    def reset_sit_timer(self):
+        """手动重置久坐计时，从现在重新累计。"""
+        self.sit_start = time.time() if self.status["present"] else None
+        self.next_sit_alert_min = self.config["sit_limit_min"]
+        self.status = {**self.status, "sit_min": 0.0}
 
     def process(self, result, now):
         """对一次采样结果执行判定和提醒逻辑，返回 (result, 画面叠加文字行)。"""
