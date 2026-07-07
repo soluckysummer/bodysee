@@ -20,12 +20,16 @@ models/
 fruitgame/assets/
 fruitgame/highscore.json
 
-# 格斗游戏：合成音效缓存
-fightgame/assets/
+# 本地实验中的游戏，暂不随仓库发布
+fightgame/
+wallgame/
+双人格斗.command
+双人格斗.bat
+缩墙勇士.command
+缩墙勇士.bat
 
-# 缩墙勇士：合成音效缓存 + 个人最高分
-wallgame/assets/
-wallgame/highscore.json
+# 本地备份
+README_backup.md
 
 # macOS
 .DS_Store
