@@ -20,6 +20,14 @@ models/
 fruitgame/assets/
 fruitgame/highscore.json
 
+# 星核指挥家：合成音乐缓存 + 个人最高分
+stargame/assets/
+stargame/highscore.json
+
+# 霓虹疾跑：合成音乐缓存 + 个人最高分
+runnergame/assets/
+runnergame/highscore.json
+
 # 本地实验中的游戏，暂不随仓库发布
 fightgame/
 wallgame/
